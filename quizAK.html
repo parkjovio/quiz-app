@@ -39,11 +39,12 @@
 
         <!-- 초기 화면 (퀴즈 시작) -->
         <div id="start-screen" class="space-y-6">
-            <!-- 로고 이미지 추가 -->
-            <img src="aklogo.png" alt="아시아경제 로고" class="w-48 h-auto mx-auto mb-4 rounded-lg shadow-md">
-            <h1 class="text-4xl font-extrabold text-blue-700 mb-6">AK! 스타일북 완전 내 스탈</h1>
+            <!-- 로고 플레이스홀더 이미지 추가 -->
+            <!-- 실제 로고를 사용하려면, GitHub Pages 저장소에 이미지를 업로드하고 src 경로를 수정해주세요. -->
+            <img src="https://github.com/parkjovio/quiz-app/aklogo.png" alt="아시아경제 로고" class="w-48 h-auto mx-auto mb-4 rounded-lg shadow-md">
+            <h1 class="text-4xl font-extrabold text-blue-700 mb-6">아시아경제 스타일북 완전정복</h1>
             <p class="text-lg text-gray-700 mb-8">
-                (최신판 적용 - 콘텐츠 편집2팀&교열팀)
+                (최신 업데이트 적용)
             </p>
             <button id="start-quiz-button" onclick="startQuizFromGoogleSheet()"
                     class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-75">
@@ -74,6 +75,13 @@
         <div id="result-screen" class="hidden flex flex-col items-center space-y-6">
             <h2 class="text-3xl font-bold text-blue-700">퀴즈 결과</h2>
             <p id="score-text" class="text-4xl font-extrabold text-green-600"></p>
+            <!-- 추가된 문구 및 링크 -->
+            <p class="text-lg text-gray-700 mt-4">
+                아시아경제 스타일북에서 더 많은 정보를 찾아보세요(<a href="https://docs.google.com/document/d/14GE_DdYGSZ8PAJdLfQJFIWB3Obo1K0hxId4ITytriXs/edit?usp=sharing" target="_blank" class="font-bold text-blue-600 hover:underline">클릭~ 링크</a>)
+            </p>
+            <p class="text-sm text-gray-500 mt-2">
+                기획 : 박충훈, 코딩 : 제미나이
+            </p>
             <img id="ending-image" src="https://placehold.co/400x200/ADD8E6/000000?text=Quiz+Complete!" alt="퀴즈 완료 이미지" class="rounded-lg shadow-md max-w-full h-auto">
             <div class="flex flex-col md:flex-row gap-4 mt-6">
                 <button onclick="resetQuiz()"
@@ -101,7 +109,7 @@
         let quizStarted = false;
 
         const startScreen = document.getElementById('start-screen');
-        const loadingScreen = document.getElementById('loading-screen');
+        const loadingScreen = document = document.getElementById('loading-screen');
         const quizScreen = document.getElementById('quiz-screen');
         const resultScreen = document.getElementById('result-screen');
 
@@ -359,10 +367,3 @@
     </script>
 </body>
 </html>
-
-
-
-
-
-
-
