@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>사지선다 객관식 퀴즈</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Inter 폰트 적용 */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        /* 로딩 스피너 스타일 */
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+
+    <div id="app-container" class="bg-white rounded-xl shadow-lg p-8 w-full max-w-2xl text-center flex flex-col items-center">
+
+        <!-- 초기 화면 (퀴즈 시작) -->
+        <div id="start-screen" class="space-y-6">
+            <!-- 로고 이미지 추가 -->
+            <img src="https://drive.google.com/uc?id=1i29Y4U8EGvsxAURzvueljXzi7qlm_HaE" alt="아시아경제 로고" class="w-48 h-auto mx-auto mb-4 rounded-lg shadow-md">
+            <h1 class="text-4xl font-extrabold text-blue-700 mb-6">아시아경제 스타일북 완전정복</h1>
+            <p class="text-lg text-gray-700 mb-8">
+                (최신 업데이트 적용)
+            </p>
+            <button id="start-quiz-button" onclick="startQuizFromGoogleSheet()"
+                    class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-75">
+                퀴즈 시작
+            </button>
+            <div id="error-message" class="text-red-600 font-semibold mt-4 hidden"></div>
+        </div>
+
+        <!-- 로딩 화면 -->
+        <div id="loading-screen" class="hidden flex flex-col items-center justify-center space-y-4">
+            <div class="spinner"></div>
+            <p class="text-xl text-gray-700">문제 로딩 중...</p>
+        </div>
+
+        <!-- 퀴즈 화면 -->
+        <div id="quiz-screen" class="hidden w-full space-y-6">
+            <h2 id="question-number" class="text-2xl font-semibold text-gray-800">문제 1/10</h2>
+            <p id="question-text" class="text-3xl font-bold text-gray-900 leading-relaxed mb-6"></p>
+
+            <div id="options-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- 옵션 버튼들이 여기에 동적으로 삽입됩니다 -->
+            </div>
+
+            <div id="feedback" class="mt-6 text-2xl font-bold"></div>
+        </div>
+
+        <!-- 결과 화면 -->
+        <div id="result-screen" class="hidden flex flex-col items-center space-y-6">
+            <h2 class="text-3xl font-bold text-blue-700">퀴즈 결과</h2>
+            <p id="score-text" class="text-4xl font-extrabold text-green-600"></p>
+            <img id="ending-image" src="https://placehold.co/400x200/ADD8E6/000000?text=Quiz+Complete!" alt="퀴즈 완료 이미지" class="rounded-lg shadow-md max-w-full h-auto">
+            <div class="flex flex-col md:flex-row gap-4 mt-6">
+                <button onclick="resetQuiz()"
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75">
+                    초기 화면으로 돌아가기
+                </button>
+                <button onclick="playAgain()"
+                        class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-75">
+                    다른 문제 풀어보기
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Google Sheet의 CSV export URL
+        // '1W25qlkdLdIAB2Z3C176wmB5o-7Aovrlm0oDLsJOuVSo'는 문서 ID, '0'은 gid (시트 ID)
+        const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1W25qlkdLdIAB2Z3C176wmB5o-7Aovrlm0oDLsJOuVSo/export?format=csv&gid=0';
+
+        let allQuestions = []; // Google Sheet에서 불러온 모든 문제
+        let currentQuizQuestions = []; // 현재 퀴즈에 사용될 10문제
+        let currentQuestionIndex = 0;
+        let correctAnswersCount = 0;
+        let quizStarted = false;
+
+        const startScreen = document.getElementById('start-screen');
+        const loadingScreen = document.getElementById('loading-screen');
+        const quizScreen = document.getElementById('quiz-screen');
+        const resultScreen = document.getElementById('result-screen');
+
+        const questionNumberElem = document.getElementById('question-number');
+        const questionTextElem = document.getElementById('question-text');
+        const optionsContainer = document.getElementById('options-container');
+        const feedbackElem = document.getElementById('feedback');
+        const scoreTextElem = document.getElementById('score-text');
+        const endingImageElem = document.getElementById('ending-image');
+        const startQuizButton = document.getElementById('start-quiz-button');
+        const errorMessageElem = document.getElementById('error-message');
+
+        /**
+         * Google Sheet에서 CSV 데이터를 불러와 퀴즈를 시작합니다.
+         */
+        async function startQuizFromGoogleSheet() {
+            // 화면 전환: 시작 -> 로딩
+            startScreen.classList.add('hidden');
+            loadingScreen.classList.remove('hidden');
+            quizScreen.classList.add('hidden');
+            resultScreen.classList.add('hidden');
+            errorMessageElem.classList.add('hidden'); // 에러 메시지 숨김
+
+            try {
+                const response = await fetch(GOOGLE_SHEET_CSV_URL);
+                if (!response.ok) {
+                    // HTTP 상태 코드가 200 OK가 아닌 경우
+                    throw new Error(`데이터를 불러오는 데 실패했습니다 (HTTP 상태: ${response.status}). Google Sheet가 '웹에 게시'되었는지, 그리고 링크가 올바른지 확인해주세요.`);
+                }
+                const csvText = await response.text();
+                parseCSV(csvText);
+
+                if (allQuestions.length === 0) {
+                    throw new Error('Google Sheet에서 유효한 문제를 찾을 수 없습니다. 파일 형식이 올바른지 확인해주세요.');
+                }
+
+                // 100개 중 10개 무작위 선택 (중복 없이)
+                currentQuizQuestions = [];
+                const shuffled = [...allQuestions].sort(() => 0.5 - Math.random());
+                currentQuizQuestions = shuffled.slice(0, 10);
+
+                if (currentQuizQuestions.length < 10) {
+                    throw new Error(`문제가 부족합니다. 최소 10개의 문제가 필요합니다. 현재 ${allQuestions.length}개.`);
+                }
+
+                currentQuestionIndex = 0;
+                correctAnswersCount = 0;
+                quizStarted = true;
+                feedbackElem.textContent = ''; // 피드백 초기화
+
+                // 로딩 화면 표시 후 퀴즈 화면으로 전환
+                setTimeout(() => {
+                    loadingScreen.classList.add('hidden');
+                    quizScreen.classList.remove('hidden');
+                    displayQuestion();
+                }, 1000); // 1초 로딩 지연
+
+            } catch (error) {
+                console.error('퀴즈 로드 중 오류 발생:', error);
+                // 'Failed to fetch' 오류는 주로 네트워크 문제나 CORS 정책 위반으로 발생합니다.
+                // 사용자에게 Google Sheet 게시 여부를 다시 확인하도록 안내합니다.
+                if (error.message.includes('Failed to fetch')) {
+                    showError('퀴즈 로드 실패: 네트워크 연결을 확인하거나, Google Sheet가 \'웹에 게시\'되어 모든 사용자가 CSV 형식으로 접근 가능한지 확인해주세요.');
+                } else {
+                    showError(`퀴즈 로드 실패: ${error.message}`);
+                }
+                resetQuiz(); // 오류 발생 시 초기 화면으로 돌아감
+            }
+        }
+
+        /**
+         * CSV 텍스트를 파싱하여 문제 객체 배열로 변환합니다.
+         * 각 줄은 하나의 문제이며, 쉼표로 구분된 값입니다.
+         * 예상 형식: 문항,항목1,항목2,항목3,항목4,정답인덱스(1-4)
+         * @param {string} csvText - CSV 파일의 내용
+         */
+        function parseCSV(csvText) {
+            allQuestions = []; // 파싱 전에 초기화
+            const lines = csvText.split('\n').filter(line => line.trim() !== ''); // 빈 줄 제거
+            lines.forEach(line => {
+                // 쉼표로 분리하되, 따옴표 안의 쉼표는 무시하도록 정규식 사용
+                // 따옴표로 감싸진 필드 처리 개선 (예: "내용,포함", "다른 내용")
+                const parts = [];
+                let inQuote = false;
+                let currentPart = '';
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+                    if (char === '"') {
+                        inQuote = !inQuote;
+                    } else if (char === ',' && !inQuote) {
+                        parts.push(currentPart.trim());
+                        currentPart = '';
+                    } else {
+                        currentPart += char;
+                    }
+                }
+                parts.push(currentPart.trim()); // 마지막 부분 추가
+
+                if (parts.length >= 6) {
+                    const question = parts[0].replace(/^"|"$/g, '').trim(); // 앞뒤 따옴표 제거
+                    const options = parts.slice(1, 5).map(opt => opt.replace(/^"|"$/g, '').trim());
+                    const correctAnswerIndex = parseInt(parts[5].trim(), 10) - 1; // 0-based 인덱스로 변환
+
+                    if (!isNaN(correctAnswerIndex) && correctAnswerIndex >= 0 && correctAnswerIndex < 4) {
+                        allQuestions.push({
+                            question: question,
+                            options: options,
+                            correctAnswerIndex: correctAnswerIndex
+                        });
+                    } else {
+                        console.warn('잘못된 정답 인덱스 또는 형식:', line);
+                    }
+                } else {
+                    console.warn('잘못된 CSV 줄 형식 (필드 수 부족):', line);
+                }
+            });
+            console.log('파싱된 문제 수:', allQuestions.length);
+        }
+
+        /**
+         * 에러 메시지를 표시합니다.
+         * @param {string} message - 표시할 에러 메시지
+         */
+        function showError(message) {
+            errorMessageElem.textContent = message;
+            errorMessageElem.classList.remove('hidden');
+            startScreen.classList.remove('hidden'); // 에러 발생 시 시작 화면으로 돌아감
+            loadingScreen.classList.add('hidden');
+            quizScreen.classList.add('hidden');
+            resultScreen.classList.add('hidden');
+        }
+
+        /**
+         * 현재 문제를 화면에 표시합니다.
+         */
+        function displayQuestion() {
+            if (currentQuestionIndex >= currentQuizQuestions.length) {
+                showResults();
+                return;
+            }
+
+            const questionData = currentQuizQuestions[currentQuestionIndex];
+            questionNumberElem.textContent = `문제 ${currentQuestionIndex + 1}/10`;
+            questionTextElem.textContent = questionData.question;
+            optionsContainer.innerHTML = ''; // 기존 옵션 초기화
+            feedbackElem.textContent = ''; // 피드백 초기화
+
+            questionData.options.forEach((option, index) => {
+                const button = document.createElement('button');
+                button.textContent = `${index + 1}. ${option}`;
+                button.className = 'option-button bg-blue-100 text-blue-800 font-semibold py-3 px-4 rounded-lg shadow-sm hover:bg-blue-200 transition duration-200 text-left';
+                button.onclick = () => checkAnswer(index);
+                optionsContainer.appendChild(button);
+            });
+        }
+
+        /**
+         * 사용자의 답변을 확인하고 피드백을 제공합니다.
+         * @param {number} selectedIndex - 사용자가 선택한 옵션의 인덱스 (0-based)
+         */
+        function checkAnswer(selectedIndex) {
+            const questionData = currentQuizQuestions[currentQuestionIndex];
+            const optionButtons = document.querySelectorAll('.option-button');
+
+            // 모든 버튼 비활성화
+            optionButtons.forEach(button => {
+                button.onclick = null; // 클릭 이벤트 제거
+                button.classList.add('cursor-not-allowed');
+            });
+
+            // 정답/오답 표시
+            if (selectedIndex === questionData.correctAnswerIndex) {
+                feedbackElem.textContent = '정답입니다!';
+                feedbackElem.className = 'mt-6 text-2xl font-bold text-green-600';
+                correctAnswersCount++;
+                optionButtons[selectedIndex].classList.add('bg-green-300', 'border-2', 'border-green-500');
+            } else {
+                feedbackElem.textContent = '오답입니다!';
+                feedbackElem.className = 'mt-6 text-2xl font-bold text-red-600';
+                optionButtons[selectedIndex].classList.add('bg-red-300', 'border-2', 'border-red-500');
+                optionButtons[questionData.correctAnswerIndex].classList.add('bg-green-300', 'border-2', 'border-green-500'); // 정답 표시
+            }
+
+            // 다음 문제로 넘어가기 (1.5초 후)
+            setTimeout(() => {
+                nextQuestion();
+            }, 1500);
+        }
+
+        /**
+         * 다음 문제로 이동하거나 퀴즈를 종료합니다.
+         */
+        function nextQuestion() {
+            currentQuestionIndex++;
+            if (currentQuestionIndex < currentQuizQuestions.length) {
+                displayQuestion();
+            } else {
+                showResults();
+            }
+        }
+
+        /**
+         * 퀴즈 결과를 화면에 표시합니다.
+         */
+        function showResults() {
+            quizScreen.classList.add('hidden');
+            resultScreen.classList.remove('hidden');
+
+            const totalQuestions = currentQuizQuestions.length;
+            const scorePercentage = (correctAnswersCount / totalQuestions) * 100;
+            scoreTextElem.textContent = `정답률: ${scorePercentage.toFixed(1)}% (${correctAnswersCount}/${totalQuestions})`;
+
+            // 엔딩 이미지 변경 (원하는 이미지 URL로 변경 가능)
+            if (scorePercentage >= 80) {
+                endingImageElem.src = "https://placehold.co/400x200/C8F0C8/000000?text=Excellent+Work!"; // 높은 점수 이미지
+            } else if (scorePercentage >= 50) {
+                endingImageElem.src = "https://placehold.co/400x200/FFFACD/000000?text=Good+Job!"; // 중간 점수 이미지
+            } else {
+                endingImageElem.src = "https://placehold.co/400x200/FFCCCC/000000?text=Keep+Practicing!"; // 낮은 점수 이미지
+            }
+        }
+
+        /**
+         * 퀴즈를 초기 상태로 재설정하고 시작 화면으로 돌아갑니다.
+         */
+        function resetQuiz() {
+            startScreen.classList.remove('hidden');
+            quizScreen.classList.add('hidden');
+            resultScreen.classList.add('hidden');
+            loadingScreen.classList.add('hidden');
+
+            allQuestions = [];
+            currentQuizQuestions = [];
+            currentQuestionIndex = 0;
+            correctAnswersCount = 0;
+            quizStarted = false;
+            errorMessageElem.classList.add('hidden');
+        }
+
+        /**
+         * 현재 로드된 문제 데이터로 새로운 퀴즈를 시작합니다.
+         */
+        function playAgain() {
+            startQuizFromGoogleSheet(); // Google Sheet에서 다시 불러와 새로운 10문제로 시작
+        }
+
+        // 초기 로드 시 시작 화면만 보이도록 설정
+        document.addEventListener('DOMContentLoaded', () => {
+            startScreen.classList.remove('hidden');
+            quizScreen.classList.add('hidden');
+            resultScreen.classList.add('hidden');
+            loadingScreen.classList.add('hidden');
+        });
+
+    </script>
+</body>
+</html>
